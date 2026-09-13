@@ -6,10 +6,6 @@ import { DiagramConverter } from './drawing/DiagramConverter'
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <div class="app">
     <header class="top-bar">
-      <div class="brand">
-        <span class="app-title">ai_board</span>
-      </div>
-
       <div class="property-controls">
         <label title="Stroke Color">
           <input type="color" id="stroke-color" value="#000000" />
