@@ -1,60 +1,205 @@
 import './style.css'
-import heroImg from './assets/hero.png'
-import typescriptLogo from './assets/typescript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.ts'
+import { BoardCanvas } from './canvas/BoardCanvas'
+import type { ToolType } from './tools/ToolType'
+import { DiagramConverter } from './drawing/DiagramConverter'
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+  <div class="app">
+    <header class="top-bar">
+      <div class="brand">
+        <span class="app-title">ai_board</span>
+      </div>
 
-<div class="ticks"></div>
+      <div class="property-controls">
+        <label title="Stroke Color">
+          <input type="color" id="stroke-color" value="#000000" />
+        </label>
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+        <label title="Stroke Width">
+          <select id="stroke-width">
+            <option value="1">Thin (1px)</option>
+            <option value="2" selected>Medium (2px)</option>
+            <option value="4">Thick (4px)</option>
+            <option value="8">Extra Thick (8px)</option>
+          </select>
+        </label>
 
-<div class="ticks"></div>
-<section id="spacer"></section>
+        <label title="Fill Color">
+          <select id="fill-color">
+            <option value="transparent" selected>No Fill</option>
+            <option value="#3b82f6">Blue Fill</option>
+            <option value="#ef4444">Red Fill</option>
+            <option value="#10b981">Green Fill</option>
+            <option value="#f59e0b">Yellow Fill</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="top-actions">
+        <button type="button" id="btn-ai-convert" class="btn-ai" title="AI Recognize Drawing Shapes">✨ AI Convert</button>
+        <button type="button" id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button type="button" id="btn-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
+        <button type="button" id="btn-clear" title="Clear Board">🗑 Clear</button>
+      </div>
+    </header>
+
+    <main class="board-area">
+      <aside class="left-toolbar">
+        <button type="button" data-tool="select" class="tool-btn" title="Select (↖)">↖</button>
+        <button type="button" data-tool="pen" class="tool-btn active" title="Pen (✎)">✎</button>
+        <button type="button" data-tool="line" class="tool-btn" title="Line (╱)">╱</button>
+        <button type="button" data-tool="rectangle" class="tool-btn" title="Rectangle (□)">□</button>
+        <button type="button" data-tool="circle" class="tool-btn" title="Circle (○)">○</button>
+        <button type="button" data-tool="arrow" class="tool-btn" title="Arrow (→)">→</button>
+        <button type="button" data-tool="text" class="tool-btn" title="Text (T)">T</button>
+        <button type="button" data-tool="eraser" class="tool-btn" title="Eraser (⌫)">⌫</button>
+      </aside>
+
+      <section class="canvas-container">
+        <canvas id="board-canvas"></canvas>
+      </section>
+    </main>
+
+    <footer class="bottom-bar">
+      <div class="zoom-controls">
+        <button type="button" id="btn-zoom-out">−</button>
+        <span id="zoom-text">100%</span>
+        <button type="button" id="btn-zoom-in">+</button>
+        <button type="button" id="btn-zoom-reset">Reset</button>
+      </div>
+
+      <div class="status" id="status-text">
+        Ready | Tool: Pen
+      </div>
+    </footer>
+  </div>
 `
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+const canvasElement = document.querySelector<HTMLCanvasElement>('#board-canvas')
+if (!canvasElement) {
+  throw new Error('Board canvas not found.')
+}
+
+const boardCanvas = new BoardCanvas(canvasElement)
+const diagramConverter = new DiagramConverter()
+
+// Tool Button Handling
+const toolButtons = document.querySelectorAll<HTMLButtonElement>('[data-tool]')
+toolButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const tool = button.dataset.tool as ToolType
+    boardCanvas.setTool(tool)
+
+    toolButtons.forEach((btn) => btn.classList.remove('active'))
+    button.classList.add('active')
+
+    updateStatus(`Tool: ${tool.toUpperCase()}`)
+  })
+})
+
+// Color & Stroke Controls
+const colorInput = document.querySelector<HTMLInputElement>('#stroke-color')
+colorInput?.addEventListener('input', (e) => {
+  boardCanvas.currentColor = (e.target as HTMLInputElement).value
+})
+
+const widthSelect = document.querySelector<HTMLSelectElement>('#stroke-width')
+widthSelect?.addEventListener('change', (e) => {
+  boardCanvas.currentWidth = parseInt((e.target as HTMLSelectElement).value, 10)
+})
+
+const fillSelect = document.querySelector<HTMLSelectElement>('#fill-color')
+fillSelect?.addEventListener('change', (e) => {
+  boardCanvas.currentFill = (e.target as HTMLSelectElement).value
+})
+
+// Undo / Redo / Clear Handlers
+const undoBtn = document.querySelector<HTMLButtonElement>('#btn-undo')
+undoBtn?.addEventListener('click', () => {
+  boardCanvas.history.undo()
+  updateStatus('Undo performed')
+})
+
+const redoBtn = document.querySelector<HTMLButtonElement>('#btn-redo')
+redoBtn?.addEventListener('click', () => {
+  boardCanvas.history.redo()
+  updateStatus('Redo performed')
+})
+
+const clearBtn = document.querySelector<HTMLButtonElement>('#btn-clear')
+clearBtn?.addEventListener('click', () => {
+  if (boardCanvas.sceneGraph.getObjects().length > 0) {
+    boardCanvas.sceneGraph.clear()
+    boardCanvas.requestRender()
+    updateStatus('Board cleared')
+  }
+})
+
+// AI Convert Button Handler
+const aiConvertBtn = document.querySelector<HTMLButtonElement>('#btn-ai-convert')
+aiConvertBtn?.addEventListener('click', () => {
+  const convertedCount = diagramConverter.convertAllFreehandStrokes(
+    boardCanvas.sceneGraph,
+    boardCanvas.history
+  )
+  boardCanvas.requestRender()
+  if (convertedCount > 0) {
+    updateStatus(`✨ AI recognized and converted ${convertedCount} drawing shape(s)!`)
+  } else {
+    updateStatus('AI: No convertable freehand shapes detected.')
+  }
+})
+
+// Zoom Controls
+const zoomOutBtn = document.querySelector<HTMLButtonElement>('#btn-zoom-out')
+const zoomInBtn = document.querySelector<HTMLButtonElement>('#btn-zoom-in')
+const zoomResetBtn = document.querySelector<HTMLButtonElement>('#btn-zoom-reset')
+const zoomText = document.querySelector<HTMLSpanElement>('#zoom-text')
+
+function updateZoomDisplay(): void {
+  if (zoomText) {
+    zoomText.textContent = `${Math.round(boardCanvas.viewport.zoom * 100)}%`
+  }
+}
+
+zoomOutBtn?.addEventListener('click', () => {
+  boardCanvas.viewport.setZoom(boardCanvas.viewport.zoom * 0.9)
+  updateZoomDisplay()
+})
+
+zoomInBtn?.addEventListener('click', () => {
+  boardCanvas.viewport.setZoom(boardCanvas.viewport.zoom * 1.1)
+  updateZoomDisplay()
+})
+
+zoomResetBtn?.addEventListener('click', () => {
+  boardCanvas.viewport.reset()
+  updateZoomDisplay()
+})
+
+boardCanvas.viewport.subscribe(() => updateZoomDisplay())
+
+// Global Keyboard Shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key.toLowerCase() === 'z') {
+      if (e.shiftKey) {
+        boardCanvas.history.redo()
+        updateStatus('Redo performed')
+      } else {
+        boardCanvas.history.undo()
+        updateStatus('Undo performed')
+      }
+    } else if (e.key.toLowerCase() === 'y') {
+      boardCanvas.history.redo()
+      updateStatus('Redo performed')
+    }
+  }
+})
+
+function updateStatus(text: string): void {
+  const statusEl = document.querySelector<HTMLDivElement>('#status-text')
+  if (statusEl) {
+    statusEl.textContent = text
+  }
+}
