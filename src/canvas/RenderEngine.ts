@@ -14,16 +14,12 @@ export class RenderEngine {
 
   public render(sceneGraph: SceneGraph, viewport: Viewport, previewObject?: BoardObject | null): void {
     const dpr = window.devicePixelRatio || 1
-    const logicalWidth = this.canvas.width / dpr
-    const logicalHeight = this.canvas.height / dpr
-
     this.ctx.save()
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
 
     this.ctx.scale(dpr, dpr)
 
-    // Render Grid Background
-    this.renderGrid(viewport, logicalWidth, logicalHeight)
+    // Removed grid rendering for minimal UI design
 
     // Apply World Viewport Transformation Matrix
     this.ctx.save()
@@ -48,28 +44,6 @@ export class RenderEngine {
     this.ctx.restore()
   }
 
-  private renderGrid(viewport: Viewport, width: number, height: number): void {
-    const gridSize = 30 * viewport.zoom
-
-    this.ctx.save()
-    this.ctx.strokeStyle = '#e5e7eb'
-    this.ctx.lineWidth = 1
-
-    const startX = ((viewport.x % gridSize) + gridSize) % gridSize
-    const startY = ((viewport.y % gridSize) + gridSize) % gridSize
-
-    this.ctx.beginPath()
-    for (let x = startX; x < width; x += gridSize) {
-      this.ctx.moveTo(x, 0)
-      this.ctx.lineTo(x, height)
-    }
-    for (let y = startY; y < height; y += gridSize) {
-      this.ctx.moveTo(0, y)
-      this.ctx.lineTo(width, y)
-    }
-    this.ctx.stroke()
-    this.ctx.restore()
-  }
 
   public renderObject(obj: BoardObject, viewport: Viewport): void {
     const customRenderer = registry.getRenderer(obj.type)
